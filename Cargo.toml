@@ -1,0 +1,16 @@
+[package]
+name = "aggregate"
+version = "0.1.0"
+authors = ["Timothy Aleem <timothy@precess.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+notify = "4.0.15"
+glob = "0.3.0"
+async-std = { version = "1.6.2", features = ["attributes"] }
+futures = "0.3"
+petgraph = "0.5.1"

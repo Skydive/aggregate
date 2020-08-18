@@ -1,0 +1,68 @@
+{
+	"base_path": "..",
+	"src_path": "src",
+	"build_path": "build",
+	"deploy_path": "deploy",
+	"modules": [{
+		"name": "html",
+		"processor": "htmlpages",
+		"options": {
+			"prefix": "pages",
+			"dest": ""
+		},
+		"content": [
+			"",
+			"login",
+			"dashboard",
+			"events",
+			"news",
+			"committee",
+			"single-feed"
+		]
+	},{
+		"name": "js",
+		"processor": "js",
+		"options": {
+			"prefix": "js",
+			"dest": "static/js"
+		},
+		"content": {
+			"vendor": [
+				"js.cookie-2.2.0.min.js",
+				"jquery-3.3.1.min.js",
+				"jquery-ui.min.js",
+				"jquery-url.min.js",
+				"native.history.js",
+				"moment.js",
+				"jdenticon-2.1.0.min.js",
+				"content-tools.min.js",
+				"isotope.pkgd.min.js",
+				"lz-string.min.js"
+			],
+			"sky": [
+				"sky-blk.js",
+				"sky-jquery.js",
+				"sky-contenttools.js",
+				"sky-notify.js"
+			],
+			"app": [
+				"sky_history.js",
+				"ajax.js",
+				"user.js",
+				"dashboard/dashboard_ajax.js",
+				"dashboard/dashboard_users.js",
+				"dashboard/dashboard_groups.js",
+				"singleton/singleton_ajax.js",
+				"singleton/singleton_ui.js",
+				"feed/feed_ajax.js",
+				"feed/feed_blk.js",
+				"feed/feed_ui.js",
+				"pinboard/pinboard.js",
+				"pinboard/pinboard_ajax.js",
+				"pinboard/pinboard_blk.js",
+				"pinboard/pinboard_ui.js",
+				"main.js"		
+			]
+		}
+	}]
+}
