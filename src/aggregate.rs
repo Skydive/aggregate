@@ -10,6 +10,8 @@ use crate::vinyl::{Vinyl, VinylError};
 
 use ansi_term::Color;
 
+use chrono::Local;
+
 //type TaskFnc = fn(Vinyl) -> Vinyl;
 pub type TaskFnc = Box<dyn Sync + Fn(Vinyl) -> Result<Vinyl, VinylError>>;
 pub struct ProcessTask {
@@ -44,19 +46,24 @@ impl Aggregate {
 						async move {
 							Self::execute(&g, n.clone()).await
 						}
-					}).collect::<Vec<_>>()).await.into_iter().map(|x| x).collect::<Result<Vec<_>, _>>()?);
+					}).collect::<Vec<_>>()).await.into_iter().collect::<Result<Vec<_>, _>>()?);
 				}
 			}
 
 			let cur_task = g.node_weight(idx.clone()).unwrap();
-			println!("{}", Color::Green.paint(format!("Starting Task: {}", cur_task.name.clone())));
-			match (cur_task.fnc)(ov) {
+			let start_time = Local::now();
+
+			println!("{}", Color::Green.paint(format!("[{}] Starting Task: {}", start_time.format("%T"), cur_task.name.clone())));
+			let result = (cur_task.fnc)(ov); 
+			let end_time = Local::now();
+			match result {
 				Ok(v) => {
-					println!("{}", Color::Green.paint(format!("Task Successful: {}", cur_task.name.clone())));
+					// TODO: CUSTOM SI UNIT DURATIONS
+					println!("{}", Color::Green.paint(format!("[{}] Task Successful: {} ({:?}s)", end_time.format("%T"), cur_task.name.clone(), (end_time-start_time).to_std().unwrap().as_secs_f64() )));
 					Ok(v)
 				}
 				Err(e) => {
-					println!("{}", Color::Red.paint(format!("Task Failure: {}, Message: {}", cur_task.name.clone(), e.to_string())));
+					println!("{}", Color::Red.paint(format!("[{}] Task Failure: {}, Message: {}", end_time.format("%T"), cur_task.name.clone(), e.to_string())));
 					Err(AggError{name: cur_task.name.clone(), msg: e.to_string()})
 				}
 			}

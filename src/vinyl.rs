@@ -5,28 +5,16 @@ use std::result::Result;
 use std::fmt;
 
 use std::fs;
-use std::mem::drop;
-
 use std::path::PathBuf;
 
 
 use ansi_term::Color;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileHandle {
 	pub file_path: PathBuf,
 	pub data: String,
 }
-
-impl Clone for FileHandle {
-    fn clone(&self) -> FileHandle {
-    	FileHandle {
-    		file_path: self.file_path.clone(),
-    		data: self.data.clone()
-    	}
-    }
-}
-
 
 impl FileHandle {
 	pub fn new(path: String, data: String) -> FileHandle {
@@ -48,28 +36,26 @@ impl FileHandle {
 	}
 
 	pub fn save(&self) -> Result<(), VinylError> {
-		let mut f: File; 
 		if !(*self.file_path).exists() {
 			fs::create_dir_all((*self.file_path).parent().unwrap())?;
-			f = File::create(self.file_path.clone())?;
-		} else {
-			println!("OPEN FILE");
-			f = File::open(self.file_path.clone())?;
 		}
-		f.write_all(self.data.as_bytes())?;
-		drop(f);
-		Ok(())
+	
+		if self.data.trim().len() > 0 {
+			fs::OpenOptions::new()
+				.read(false).write(true)
+				.create(true).truncate(true)
+				.open(self.file_path.clone())?
+				.write(self.data.as_bytes())?;
+			Ok(())
+		} else {
+			Err(VinylError{msg: "Data corrupted/empty".to_string()})
+		}
+
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Vinyl(Vec<FileHandle>);
-
-impl Clone for Vinyl {
-    fn clone(&self) -> Vinyl {
-    	Vinyl(self.0.iter().map(|fh| fh.clone()).collect())
-    }
-}
 
 impl Vinyl {
 	pub fn new_empty() -> Vinyl {
