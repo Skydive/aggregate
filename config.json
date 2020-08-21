@@ -1,8 +1,10 @@
 {
-	"base_path": "",
-	"src_path": "",
-	"build_path": "build",
-	"deploy_path": "deploy",
+	"meta": {
+		"base_path": "..",
+		"src_path": "src",
+		"build_path": "test",
+		"deploy_path": "deploy"
+	},
 	"modules": [{
 		"name": "html",
 		"processor": "htmlpages",
@@ -28,27 +30,20 @@
 		},
 		"content": {
 			"vendor": [
-				"js.cookie-2.2.0.min.js",
 				"jquery-3.3.1.min.js",
-				"jquery-ui.min.js",
-				"jquery-url.min.js",
 				"native.history.js",
-				"moment.js",
-				"jdenticon-2.1.0.min.js",
-				"content-tools.min.js",
-				"isotope.pkgd.min.js",
-				"lz-string.min.js"
+				"hammer.min.js"
 			],
 			"sky": [
-				"sky-blk.js",
 				"sky-jquery.js",
-				"sky-contenttools.js",
-				"sky-notify.js"
+				"sky-mobile.js",
+				"sky-carousel.js",
+				"sky-fourierface.js"
 			],
 			"app": [
-				"files/tes1",
-				"files/test2",
-				"files/test3"
+				"skychat.js",
+				"weights.js",
+				"main.js"
 			]
 		}
 	}]

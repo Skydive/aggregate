@@ -10,16 +10,16 @@ use std::path::PathBuf;
 
 use ansi_term::Color;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FileHandle {
 	pub file_path: PathBuf,
 	pub data: String,
 }
 
 impl FileHandle {
-	pub fn new(path: String, data: String) -> FileHandle {
+	pub fn new(path: PathBuf, data: String) -> FileHandle {
 		FileHandle { 
-			file_path: PathBuf::from(path),
+			file_path: path.clone(),
 			data: data
 		}
 	}
@@ -54,23 +54,19 @@ impl FileHandle {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Vinyl(Vec<FileHandle>);
 
 impl Vinyl {
-	pub fn new_empty() -> Vinyl {
-		Vinyl(vec![])
-	}
-
 	pub fn load(files: Vec<PathBuf>) -> Result<Vinyl, VinylError> {
 		Ok(Vinyl(files.into_iter().map(|f| FileHandle::load(f)).collect::<Result<Vec<_>, _>>()?))
 	}
 
 	pub fn stitch(vs: Vec<Vinyl>) -> Vinyl {
-		vs.iter().fold(Vinyl::new_empty(), |acc, v| Vinyl([&acc.0[..], &v.0[..]].concat()) )
+		vs.iter().fold(Vinyl::default(), |acc, v| Vinyl([&acc.0[..], &v.0[..]].concat()) )
 	}
 
-	pub fn concat(&self, path: String) -> Vinyl {
+	pub fn concat(&self, path: PathBuf) -> Vinyl {
 		Vinyl(vec![FileHandle::new(path, self.0.iter().fold(String::from(""), |acc, h| acc+&h.data))])
 	}
 
