@@ -13,13 +13,7 @@
 			"dest": ""
 		},
 		"content": [
-			"",
-			"login",
-			"dashboard",
-			"events",
-			"news",
-			"committee",
-			"single-feed"
+			""
 		]
 	},{
 		"name": "js",
@@ -46,5 +40,16 @@
 				"main.js"
 			]
 		}
+	},{
+		"name": "static",
+		"processor": "clone",
+		"options": {
+			"prefix": "static",
+			"dest": "static",
+			"revision": true
+		},
+		"content": [
+			"**/*.*"
+		]
 	}]
 }

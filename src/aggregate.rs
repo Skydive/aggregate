@@ -16,48 +16,65 @@ use crate::vinyl::{Vinyl, VinylError};
 use ansi_term::Color;
 
 use chrono::Local;
+
+use crate::log::Log;
 //type TaskFnc = fn(Vinyl) -> Vinyl;
 // TODO: MAKE THIS INTO AN ASYNC CLOSURE<--/--> FUTURE DATATYPE!
 pub type TaskFnc = Box<dyn Sync + Send + Fn(Vinyl) -> Result<Vinyl, VinylError>>;
 pub struct ProcessTask {
 	pub name: String, 
 	pub fnc: TaskFnc,
+	pub quiet: bool
 }
+pub type TaskGraph = Graph<ProcessTask, ()>;
+pub type TaskIndex = NodeIndex;
 
 pub struct Aggregate();
 impl Aggregate {
-	pub fn chain(g: &mut Graph<ProcessTask, ()>, name: String, fnc: TaskFnc, dep_node_idx: Vec<NodeIndex>)  -> NodeIndex {
-		let node = g.add_node(ProcessTask {name: name,  fnc: fnc});
+	pub fn chain(g: &mut TaskGraph, name: String, fnc: TaskFnc, dep_node_idx: Vec<TaskIndex>, q: bool) -> TaskIndex {
+		let node = g.add_node(ProcessTask {name: name,  fnc: fnc, quiet: q});
 		dep_node_idx.iter().for_each(|ni| {g.add_edge(ni.clone(), node.clone(), ());} );
 		node.clone()
 	}
 
-	
+	// pub fn execute_by_name(g: &TaskGraph, name: String) -> Result<Vinyl, AggError> {
+	// 	// For all node_indices
+	// 	let (idx, _) = g.node_indices()
+	// 		.map(|i| (i.clone(), g[i]) )
+	// 		.filter(|(idx, task)| task.name == name).map(|x| x.0).collect::<Vec<_>>().first().unwrap();
+	// 	task::block_on(Self::execute(Arc::new(g), idx))
+	// }
 
-	pub fn execute(g: Arc<Graph<ProcessTask, ()>>, idx: NodeIndex) -> BoxFuture<'static, Result<Vinyl, AggError>> {
+	pub fn execute(g: Arc<TaskGraph>, idx: TaskIndex) -> BoxFuture<'static, Result<Vinyl, AggError>> {
 		async move {
 			let neighbors = g.neighbors_directed(idx, Direction::Incoming).collect::<Vec<_>>();
 			let cur_task = g.node_weight(idx.clone()).unwrap();
 			let start_time = Local::now();
-			println!("[{}] (W{:0twidth$}) {} {}", start_time.format("%T"),  thread::current().id().as_u64(), Color::Green.paint("Starting Task:"), cur_task.name.clone(), twidth=2);
+			// TODO: IMPLEMENT LOG.RS LOG FUNCTION
+
+			//if !cur_task.quiet { Log::task(format!("{} {}", Color::Green.paint("Task Starting:"), cur_task.name.clone())); }
 
 			// DEPENDENCIES
 			let mut ov = Vinyl::default();
-			let neigh_names = neighbors.iter().map(|n| {
-				let parent_task = g.node_weight(n.clone()).unwrap();
-				parent_task.name.clone()
-			}).collect::<Vec<_>>();
+			// let neigh_names = neighbors.iter().map(|n| {
+			// 	let parent_task = g.node_weight(n.clone()).unwrap();
+			// 	parent_task.name.clone()
+			// }).collect::<Vec<_>>();
 			match neighbors.len() {
 				0 => {}
 				1 => {
 					// SERIES EXECUTOR
-					println!("[{}] (W{:0twidth$}) {} {:?}", Local::now().format("%T"), thread::current().id().as_u64(), Color::Cyan.paint("Series Dependency:"), neigh_names, twidth=2);
+					//Log::task(format!("{} {:?}", Color::Green.paint("Parallel Dependency:"), neigh_names));
+					if !cur_task.quiet { Log::task(format!("{}\t{}", Color::Green.paint("Task Starting:"), cur_task.name.clone())); }
+					
 					let parent_idx = neighbors.first().map(|n| n.clone()).unwrap();
 					ov = Self::execute(g.clone(), parent_idx).await?;
 				}
 				_ => {
 					// PARALLEL EXECUTOR
-					println!("[{}] (W{:0twidth$}) {} {:?}", Local::now().format("%T"), thread::current().id().as_u64(), Color::Yellow.paint("Parallel Dependency:"), neigh_names, twidth=2);
+					if !cur_task.quiet { Log::task(format!("{} {:23}<{}>", Color::Green.paint("Task Starting:"), cur_task.name.clone(), Color::Yellow.paint(neighbors.len().to_string()))); }
+					//if !cur_task.quiet { Log::task(format!("{} {:?}", Color::Yellow.paint("Task Starting:"), neigh_names)); }
+					
 					ov = Vinyl::stitch(join_all(neighbors.into_iter().map(|n| {
 						let new_g = g.clone();
 						async move { Self::execute(new_g, n.clone()).await }
@@ -73,11 +90,12 @@ impl Aggregate {
 				Ok(v) => {
 					// TODO: CUSTOM SI UNIT DURATIONS
 					// TODO: Color duration
-					println!("[{}] (W{:0twidth$}) {}: {} \t\t({})", end_time.format("%T"), thread::current().id().as_u64(), Color::Green.paint("Task Successful"), cur_task.name.clone(), Color::Purple.paint(format!("{:.4}s", (end_time-start_time).to_std().unwrap().as_secs_f64())), twidth=2);
+					if !cur_task.quiet { Log::task(format!("{} {:20}({})", Color::Green.paint("Task Success: "), cur_task.name.clone(), Color::Purple.paint(format!("{:.4}s", (end_time-start_time).to_std().unwrap().as_secs_f64())))); }
 					Ok(v)
 				}
 				Err(e) => {
-					println!("[{}] (W{:0twidth$}) {} {} \nError Message:\n{}", end_time.format("%T"), thread::current().id().as_u64(), Color::Red.paint("Task Failure:"), cur_task.name.clone(), e.to_string(), twidth=2);
+					let gap = (end_time-start_time).to_std().unwrap().as_secs_f64();
+					Log::task(format!("{} {:20}({}) \nError Message:\n{}", Color::Red.paint("Task Failure: "), cur_task.name.clone(), Color::Purple.paint(format!("{:.4}s", gap)), e.to_string()));
 					Err(AggError{name: cur_task.name.clone(), msg: e.to_string()})
 				}
 			}

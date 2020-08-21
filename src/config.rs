@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::vec::Vec;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct Config<V=serde_json::Value> {
 	pub meta: ConfigMeta,
 	pub modules: Vec<ConfigModule<V, V>>
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct ConfigMeta {
 	pub base_path: String,
 	pub src_path: String,
@@ -15,7 +15,7 @@ pub struct ConfigMeta {
 	pub deploy_path: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
 pub struct ConfigModule<T, U> {
 	pub name: String,
 	pub processor: String,
