@@ -1,6 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-#![feature(async_closure)]
-#![feature(pin)]
+#![feature(thread_id_value)]
 
 #[macro_use]
 extern crate ansi_term;
@@ -25,7 +24,7 @@ use aggregate::{Aggregate, AggError, ProcessTask};
 
 use processor::js::*;
 
-//use std::sync::Arc;std::boxed::PinBox;
+use std::sync::Arc;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -110,7 +109,7 @@ async fn main() -> std::io::Result<()> {
 		Ok(Vinyl::default())
 	}), processors_tasks);
 
-	let ret = task::block_on(Aggregate::execute(&mut g, build_node));
+	let ret = task::block_on(Aggregate::execute(Arc::new(g), build_node));
 	println!("JS TASKS END!");
 
     Ok(())

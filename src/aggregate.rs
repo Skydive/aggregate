@@ -1,8 +1,11 @@
 
 use std::fmt;
+use std::thread;
+use std::sync::Arc;
 
 use petgraph::Direction;
 use petgraph::graph::{Graph, NodeIndex};
+
 
 use async_std::task;
 use futures::future::join_all; 
@@ -13,7 +16,6 @@ use crate::vinyl::{Vinyl, VinylError};
 use ansi_term::Color;
 
 use chrono::Local;
-
 //type TaskFnc = fn(Vinyl) -> Vinyl;
 // TODO: MAKE THIS INTO AN ASYNC CLOSURE<--/--> FUTURE DATATYPE!
 pub type TaskFnc = Box<dyn Sync + Send + Fn(Vinyl) -> Result<Vinyl, VinylError>>;
@@ -32,12 +34,12 @@ impl Aggregate {
 
 	
 
-	pub fn execute<'a>(g: &'a Graph<ProcessTask, ()>, idx: NodeIndex) -> BoxFuture<'a, Result<Vinyl, AggError>> {
+	pub fn execute(g: Arc<Graph<ProcessTask, ()>>, idx: NodeIndex) -> BoxFuture<'static, Result<Vinyl, AggError>> {
 		async move {
 			let neighbors = g.neighbors_directed(idx, Direction::Incoming).collect::<Vec<_>>();
 			let cur_task = g.node_weight(idx.clone()).unwrap();
 			let start_time = Local::now();
-			println!("[{}] {} {}", start_time.format("%T"),  Color::Green.paint("Starting Task:"), cur_task.name.clone());
+			println!("[{}] (W{:0twidth$}) {} {}", start_time.format("%T"),  thread::current().id().as_u64(), Color::Green.paint("Starting Task:"), cur_task.name.clone(), twidth=2);
 
 			// DEPENDENCIES
 			let mut ov = Vinyl::default();
@@ -49,25 +51,21 @@ impl Aggregate {
 				0 => {}
 				1 => {
 					// SERIES EXECUTOR
+					println!("[{}] (W{:0twidth$}) {} {:?}", Local::now().format("%T"), thread::current().id().as_u64(), Color::Cyan.paint("Series Dependency:"), neigh_names, twidth=2);
 					let parent_idx = neighbors.first().map(|n| n.clone()).unwrap();
-					println!("[{}] {} {:?}", Local::now().format("%T"), Color::Cyan.paint("Series Dependency:"), neigh_names);
-					ov = Self::execute(&g, parent_idx).await?;
+					ov = Self::execute(g.clone(), parent_idx).await?;
 				}
 				_ => {
 					// PARALLEL EXECUTOR
-					let neigh_names = neighbors.iter().map(|n| {
-						let parent_task = g.node_weight(n.clone()).unwrap();
-						parent_task.name.clone()
-					}).collect::<Vec<_>>();
-					println!("[{}] {} {:?}", Local::now().format("%T"), Color::Yellow.paint("Parallel Dependency:"), neigh_names);
-					ov = Vinyl::stitch(join_all(neighbors.iter().map(|n| {
-						async move {
-							Self::execute(&g, n.clone()).await
-						}
-					}).collect::<Vec<_>>()).await.into_iter().collect::<Result<Vec<_>, _>>()?);
+					println!("[{}] (W{:0twidth$}) {} {:?}", Local::now().format("%T"), thread::current().id().as_u64(), Color::Yellow.paint("Parallel Dependency:"), neigh_names, twidth=2);
+					ov = Vinyl::stitch(join_all(neighbors.into_iter().map(|n| {
+						let new_g = g.clone();
+						async move { Self::execute(new_g, n.clone()).await }
+					})
+					.map(task::spawn)
+					.collect::<Vec<_>>()).await.into_iter().collect::<Result<Vec<_>, _>>()?);
 				}
 			}
-
 			
 			let result = (cur_task.fnc)(ov); 
 			let end_time = Local::now();
@@ -75,11 +73,11 @@ impl Aggregate {
 				Ok(v) => {
 					// TODO: CUSTOM SI UNIT DURATIONS
 					// TODO: Color duration
-					println!("[{}] {} {} \t({}s)", start_time.format("%T"), Color::Green.paint("Task Successful:"), cur_task.name.clone(), (end_time-start_time).to_std().unwrap().as_secs_f64());
+					println!("[{}] (W{:0twidth$}) {}: {} \t\t({})", end_time.format("%T"), thread::current().id().as_u64(), Color::Green.paint("Task Successful"), cur_task.name.clone(), Color::Purple.paint(format!("{:.4}s", (end_time-start_time).to_std().unwrap().as_secs_f64())), twidth=2);
 					Ok(v)
 				}
 				Err(e) => {
-					println!("{}", Color::Red.paint(format!("[{}] Task Failure: {}, Message: {}", end_time.format("%T"), cur_task.name.clone(), e.to_string())));
+					println!("[{}] (W{:0twidth$}) {} {} \nError Message:\n{}", end_time.format("%T"), thread::current().id().as_u64(), Color::Red.paint("Task Failure:"), cur_task.name.clone(), e.to_string(), twidth=2);
 					Err(AggError{name: cur_task.name.clone(), msg: e.to_string()})
 				}
 			}
