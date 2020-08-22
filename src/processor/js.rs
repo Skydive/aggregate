@@ -21,6 +21,16 @@ pub type ContentJS = HashMap<String, Vec<String>>;
 #[derive(Debug)]
 struct ProcessorJS();
 
+macro_rules! clone {
+    ($i:ident) => (let $i = $i.clone();)
+}
+
+macro_rules! clone_all {
+    ($($i:ident),+) => {
+        $(clone!($i);)+
+    }
+}
+
 impl GenerateGraphs for ProcessorJS {
 	fn generate_graphs(&self, mut g: &mut TaskGraph, meta: ConfigMeta, cfg_mod: ConfigModule<Value, Value>) -> (TaskIndex, TaskIndex) {
 		//let conf_js: ConfigModule<OptionsJS, ContentJS> = serde_json::from_str(&serde_json::to_string(m).unwrap()).unwrap();
@@ -66,12 +76,12 @@ impl GenerateGraphs for ProcessorJS {
 					.save_all()
 			}), vec![], false));
 
-			let (cap_file, cap_paths) = (deploy_file_path.clone(), wild_paths.clone());
-			deploy_nodes.push(Aggregate::chain(&mut g, sub_deploy_name.clone(), Box::new(move |_v| {
-				Vinyl::load(cap_paths.clone())?
-					.concat(cap_file.clone())
-					.save_all()
-			}), vec![], false));
+			// let (cap_file, cap_paths) = (deploy_file_path.clone(), wild_paths.clone());
+			// deploy_nodes.push(Aggregate::chain(&mut g, sub_deploy_name.clone(), Box::new(move |_v| {
+			// 	Vinyl::load(cap_paths.clone())?
+			// 		.concat(cap_file.clone())
+			// 		.save_all()
+			// }), vec![], false));
 
 			//println!("{:?} {:?}", build_name.clone(), build_file_path.clone());
 		}

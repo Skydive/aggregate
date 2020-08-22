@@ -8,16 +8,13 @@ use std::fs;
 
 use regex::Regex;
 
-
-
-
-
-
 use crate::aggregate::{Aggregate, TaskGraph, TaskIndex};
 use crate::config::{ConfigModule, ConfigMeta};
 use crate::vinyl::{Vinyl, VinylError, FileHandle};
 
 use super::GenerateGraphs;
+
+
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct OptionsHTMLPages {
@@ -31,54 +28,16 @@ pub type ContentHTMLPages = Vec<String>;
 #[derive(Debug, Default)]
 pub struct ProcessorHTMLPages();
 
-// function parse_template(template) {
-// 	let regex_command = /<!--@(.*) (.*) -->/g;
-// 	let out = [];
-// 	let m = null;
-// 	while ((m = regex_command.exec(template)) !== null){
-// 		out.push({
-// 			raw: m[0],
-// 			command: m[1],
-// 			args: m[2]
-// 		});
-// 	}
-// 	return out;
-// };
-// function process_template(args) {
-// 	let parsed_template = parse_template(args.template);
-// 	let out = {};
-// 	parsed_template.filter(x => x.command === 'output-begin').map(function(x) {
-// 		let regex_grab = new RegExp("<!--@output-begin "+x.args+" -->([\\s\\S]*)<!--@output-end "+x.args+" -->", 'g');
-// 		let m = null;
-// 		while ((m = regex_grab.exec(args.template)) !== null) {
-// 			let content = m[1];
-// 			let regex_import = /<!--@import (.*) -->/g;
-// 			content = content.replace(regex_import, function(n, src) {
-// 				let type = path.extname(src);
-// 				if(src[0] === "/") {
-// 					src = path.join(`${args.content_path}`, src.substr(1, src.length));
-// 				} else {
-// 					src = path.join(`${args.base}`, src);
-// 				}
-// 				let data = '';
-// 				if(fs.existsSync(src)) {
-// 					data = fs.readFileSync(src);
-// 				}
-// 				switch(type) {
-// 				case '.css':
-// 					data = `<style>${data}</style>`;
-// 					break;
-// 				case '.js':
-// 					data = `<script>${data}</script>`;
-// 					break;
-// 				}
-// 				return data;
-// 			});
-// 			out[x.args] = content;
-// 		}
-// 	});
-// 	return out;
-// }
+macro_rules! clone {
+    ($i:ident) => (let $i = $i.clone();)
+}
+
+macro_rules! clone_all {
+    ($($i:ident),+) => {
+        $(clone!($i);)+
+    }
+}
+
 
 lazy_static! {
 	static ref REGEX_CMD: Regex = Regex::new(r"<!--@(.+)[^\S\r\n](.+)[^\S\r\n]-->").unwrap();
@@ -130,9 +89,8 @@ impl ProcessorHTMLPages {
 				[_, "import", import_path] => {
 					let file_path = Self::format_import_arg(import_path.to_string(), template_dirname.clone(), meta.clone());
 				
-					let handle = FileHandle::load(file_path)?;
-					let data_str = std::str::from_utf8(handle.data.as_slice()).unwrap();
-					stage1_template += data_str;
+					let data_str = fs::read_to_string(file_path)?;
+					stage1_template += &data_str;
 				}
 				[_, s, ..] => {
 					if let Some(_) = STAGE1_IGNORE_CMD.iter().find(|ss| ss == &s) {
@@ -165,9 +123,9 @@ impl ProcessorHTMLPages {
 					if let Some(&start) = output_map.get(out_path) {
 
 						let pages_post = template_dirname.strip_prefix(path_prefix.clone()).unwrap();
-						let page_out_path = out_prefix.join(pages_post).join(out_path);
+						let page_rel_path = Path::new(pages_post).join(out_path);
 						
-						FileHandle::new(page_out_path, stage1_file.as_str()[start..pm.start()].as_bytes().to_vec()).save()?;
+						FileHandle::new(out_prefix, page_rel_path, stage1_file.as_str()[start..pm.start()].as_bytes().to_vec()).save()?;
 					}
 				}
 				_ => {}
@@ -213,14 +171,16 @@ impl GenerateGraphs for ProcessorHTMLPages {
 
 			let page_template_path = path_prefix.join(page).join("template.html").to_path_buf();
 			
-			let (cap_meta, cap_page, cap_template_path, cap_path_prefix, cap_build_prefix) = (meta.clone(), page.clone(), page_template_path.clone(), path_prefix.clone(), build_prefix.clone());
-			build_nodes.push(Aggregate::chain(&mut g, build_name_page.clone(), Box::new(move |_v| {
-				if !(*cap_template_path).exists() { 
-					return Err(VinylError{msg: format!("ERROR: {} {:?}", cap_page.clone(), cap_template_path.clone())});
+			build_nodes.push(Aggregate::chain(&mut g, build_name_page.clone(), Box::new({
+				clone_all!(meta, page, page_template_path, path_prefix, build_prefix);
+				move |_v| {
+					if !(*page_template_path).exists() { 
+						return Err(VinylError{msg: format!("ERROR: {} {:?}", page.clone(), page_template_path.clone())});
+					}
+					let stage1_template = Self::process_template(page_template_path.clone(), meta.clone())?;
+					Self::write_outputs(page_template_path.clone(), meta.clone(), stage1_template, path_prefix.clone(), build_prefix.clone())?;
+					Ok(_v)
 				}
-				let stage1_template = Self::process_template(cap_template_path.clone(), cap_meta.clone())?;
-				Self::write_outputs(cap_template_path.clone(), cap_meta.clone(), stage1_template, cap_path_prefix.clone(), cap_build_prefix.clone())?;
-				Ok(_v)
 			}), vec![], false));
 
 			let (cap_meta, cap_page, cap_template_path, cap_path_prefix, cap_deploy_prefix) = (meta.clone(), page.clone(), page_template_path.clone(), path_prefix.clone(), deploy_prefix.clone());
