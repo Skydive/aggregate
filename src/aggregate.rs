@@ -1,6 +1,6 @@
 
 use std::fmt;
-use std::thread;
+
 use std::sync::Arc;
 
 use petgraph::Direction;
@@ -37,13 +37,18 @@ impl Aggregate {
 		node.clone()
 	}
 
-	// pub fn execute_by_name(g: &TaskGraph, name: String) -> Result<Vinyl, AggError> {
-	// 	// For all node_indices
-	// 	let (idx, _) = g.node_indices()
-	// 		.map(|i| (i.clone(), g[i]) )
-	// 		.filter(|(idx, task)| task.name == name).map(|x| x.0).collect::<Vec<_>>().first().unwrap();
-	// 	task::block_on(Self::execute(Arc::new(g), idx))
-	// }
+	pub fn execute_by_name(g: Arc<TaskGraph>, name: &str) -> Result<Vinyl, AggError> {
+		for idx in g.node_indices() {
+			let task = g.node_weight(idx.clone()).unwrap();
+			//println!("{}", task.name.clone());
+			if &task.name == name {
+				Log::task(format!("{}\t{}", Color::Green.paint("Task Found:"), name));
+				return task::block_on(Self::execute(g, idx.clone()));
+			}
+		}
+		Log::task(format!("{}\t{}", Color::Red.paint("Task Missing:"), name));
+		Err(AggError{name: "???".to_string(), msg: "???".to_string()})
+	}
 
 	pub fn execute(g: Arc<TaskGraph>, idx: TaskIndex) -> BoxFuture<'static, Result<Vinyl, AggError>> {
 		async move {
