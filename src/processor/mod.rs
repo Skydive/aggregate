@@ -9,6 +9,9 @@ pub mod concat;
 pub mod clone;
 pub mod htmlpages;
 
+#[cfg(feature = "swc")]
+pub mod swc;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use glob::glob;
@@ -21,6 +24,8 @@ lazy_static! {
 		map.insert("concat", concat::new_processor());
 		map.insert("clone", clone::new_processor());
 		map.insert("htmlpages", htmlpages::new_processor());
+		#[cfg(feature = "swc")]
+		map.insert("swc", swc::new_processor());
 		map
 	};
 }

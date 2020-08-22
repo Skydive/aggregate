@@ -13,17 +13,15 @@ use crate::vinyl::Vinyl;
 use super::GenerateGraphs;
 
 #[derive(Serialize, Deserialize)]
-pub struct OptionsConcat {
+pub struct OptionsSwc {
 	pub prefix: String,
 	pub dest: String,
-	pub ext: String,
-	#[serde(default)]
-	pub revision: bool
+	pub out: String
 }
-pub type ContentConcat = HashMap<String, Vec<String>>;
+pub type ContentSwc = HashMap<String, Vec<String>>;
 
 #[derive(Debug)]
-struct ProcessorConcat();
+struct ProcessorSwc();
 
 macro_rules! clone {
     ($i:ident) => (let $i = $i.clone();)
@@ -35,20 +33,18 @@ macro_rules! clone_all {
     }
 }
 
-impl GenerateGraphs for ProcessorConcat {
+impl GenerateGraphs for ProcessorSwc {
 	fn generate_graphs(&self, mut g: &mut TaskGraph, meta: ConfigMeta, cfg_mod: ConfigModule<Value, Value>) -> (TaskIndex, TaskIndex) {
 		//let conf_js: ConfigModule<OptionsJS, ContentJS> = serde_json::from_str(&serde_json::to_string(m).unwrap()).unwrap();
-		let conf_concat: ConfigModule<OptionsConcat, ContentConcat> = ConfigModule {
+		let conf_swc: ConfigModule<OptionsSwc, ContentSwc> = ConfigModule {
 			name: cfg_mod.name.clone(),
 			processor: cfg_mod.processor.clone(),
 			options: serde_json::from_value(cfg_mod.options.clone()).unwrap(),
 			content: serde_json::from_value(cfg_mod.content.clone()).unwrap(),
 		};
 
-		let rev = conf_concat.options.revision;
-
-		let build_name = format!("build:{}", conf_concat.name);
-		let deploy_name = format!("deploy:{}", conf_concat.name);
+		let build_name = format!("build:{}", conf_swc.name);
+		let deploy_name = format!("deploy:{}", conf_swc.name);
 		let mut build_nodes = Vec::default();
 		let mut deploy_nodes = Vec::default();
 		for (k, v) in &conf_concat.content {
@@ -95,7 +91,7 @@ impl GenerateGraphs for ProcessorConcat {
 				Ok(_v)
 			}), build_nodes, false), 
 			Aggregate::chain(&mut g, deploy_name.clone(), Arc::new(move |_v| {
-				if rev {Ok(_v.revisions().save_all()?)} else {Ok(_v)}
+				Ok(_v.revisions().save_all()?)
 			}), deploy_nodes, false)
 		)
 	}

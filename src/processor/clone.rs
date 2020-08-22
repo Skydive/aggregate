@@ -19,6 +19,7 @@ use super::GenerateGraphs;
 pub struct OptionsClone {
 	pub prefix: String,
 	pub dest: String,
+	#[serde(default)]
 	pub revision: bool
 }
 pub type ContentClone = Vec<String>;
@@ -44,6 +45,8 @@ impl GenerateGraphs for ProcessorClone {
 			options: serde_json::from_value(cfg_mod.options.clone()).unwrap(),
 			content: serde_json::from_value(cfg_mod.content.clone()).unwrap(),
 		};
+
+		let rev = conf_clone.options.revision;
 
 		let build_name = format!("build:{}", conf_clone.name);
 		let deploy_name = format!("deploy:{}", conf_clone.name);
@@ -89,7 +92,7 @@ impl GenerateGraphs for ProcessorClone {
 					let mut hs = FileHandle::load(src_path.clone(), in_rel_path.clone().to_path_buf())?;
 					hs.out_path = out_path_deploy.clone();
 					hs.rel_path = out_rel_path.clone();
-					Ok(_v.insert(hs))
+					if rev {Ok(_v.insert(hs))} else {Ok(_v.insert(hs).save_all()?)}
 				}
 			}), vec![], true));
 		});
@@ -99,7 +102,7 @@ impl GenerateGraphs for ProcessorClone {
 				Ok(_v)
 			}), build_nodes, false), 
 			Aggregate::chain(&mut g, deploy_name.clone(), Arc::new(move |_v| {
-				Ok(_v.revisions().save_all()?)
+				if rev {Ok(_v.revisions().save_all()?)} else {Ok(_v)}
 			}), deploy_nodes, false)
 		)
 	}

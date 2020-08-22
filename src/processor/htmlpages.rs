@@ -93,6 +93,14 @@ impl ProcessorHTMLPages {
 					let data_str = fs::read_to_string(file_path)?;
 					stage1_template += &data_str;
 				}
+				[_, "import-js", import_path] => {
+					let file_path = Self::format_import_arg(import_path.to_string(), template_dirname.clone(), meta.clone());
+				
+					let data_str = fs::read_to_string(file_path)?;
+					stage1_template += "<script>";
+						stage1_template += &data_str;
+					stage1_template += "</script>";
+				}
 				[_, s, ..] => {
 					if let Some(_) = STAGE1_IGNORE_CMD.iter().find(|ss| ss == &s) {
 						stage1_template += &template[pm.start()..pm.end()]; // INCLUDE IGNORED COMMANDS

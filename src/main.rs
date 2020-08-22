@@ -10,6 +10,9 @@ extern crate regex;
 extern crate notify;
 extern crate crc;
 
+#[cfg(feature = "swc")]
+extern crate swc_proc;
+
 mod config;
 mod vinyl;
 mod aggregate;
@@ -37,25 +40,33 @@ macro_rules! clone_all {
     }
 }
 
-// TODO: clean main()
-// TODO: watchers into new file
-// TODO: per_file watchers <file_path -> task_name>
 // TODO: macro + code cleanup
+	// TODO: clean main()
 	// TODO: PATH --> STRING macro
 	// TODO: log format
 	// TODO: Shorten aggregate chain
 	// TODO: PATH construction shorten
 	// TODO: FIX clone!
-// TODO: MODULARITY?!?!
-// TODO: SWC?!
-// TODO: htmlpages improvements
+// TODO: aggregate cleaner error handling (anyhow::Error!?)
+// TODO: Speed up revisioning (somehow)
+
+// TITLE: WATCHER IMPROVEMENTS
+// TODO: watchers into new file
+// TODO: per_file watchers <file_path -> task_name> [DO PER_DIRECTORY + WILDCARD!?]
+
+
+// TITLE: PROCESSOR IMPROVEMENTS
+// TODO: processor (quiet) argument
+// TODO: Add revision option ARGS to concat and swc  
+// TODO: MODULARITY?!?! http://adventures.michaelfbryan.com/posts/plugins-in-rust/
+// TODO: JS MINIFY!?
+// TODO: SWC?! (ALMOST DONE)
+// TODO: SASS? 
+// TODO: htmlpages improvements (recursive templating!, better error handling)
 
 #[async_std::main]
 async fn main() -> std::io::Result<()> {
-	println!("
-	   ---------------------------------
-	   |     {}     |
-	   ---------------------------------", Color::Cyan.paint("Welcome to Aggregate!"));
+	println!("\n\t   ---------------------------------\n\t   |     {}     |\n\t   ---------------------------------", Color::Cyan.paint("Welcome to Aggregate!"));
 
 	
 	let argsv = env::args().collect::<Vec<String>>();
@@ -88,10 +99,11 @@ async fn main() -> std::io::Result<()> {
 	}
 	// TODO: MOVE INTO SEPERATE FUNCTION OR FILE!?
 	// TODO: MOVE REVISIONING OUT OF Vinyl -> Use Box<dyn Modifier?> API?!
+	// TODO: PARALELLISE!?!?
 	let rev_replace_task = Aggregate::chain(&mut g, "deploy:rev_replace".to_string(), Arc::new({
 		clone_all!(meta);
 		move |_v| {
-			let out_path_files = Path::new(&meta.base_path).join(&meta.build_path).join("**/*").to_path_buf();
+			let out_path_files = Path::new(&meta.base_path).join(&meta.deploy_path).join("**/*").to_path_buf();
 			use glob::glob;
 			use std::io::Write;
 			for file_path in glob(out_path_files.to_str().unwrap()).unwrap().filter_map(|x| x.ok()) {
@@ -113,7 +125,7 @@ async fn main() -> std::io::Result<()> {
 	}), deploy_tasks, false);
 
 	Log::task(format!("{} {}", Color::Blue.paint("Loaded procesors:"), processor_list.join(", ")));
-	let build_task = Aggregate::chain(&mut g, "build".to_string(), Arc::new(|_v| Ok(_v)), build_tasks, false);
+	Aggregate::chain(&mut g, "build".to_string(), Arc::new(|_v| Ok(_v)), build_tasks, false);
 	Aggregate::chain(&mut g, "deploy".to_string(), Arc::new(|_v| Ok(_v)), vec![rev_replace_task], false);
 
 
@@ -177,7 +189,7 @@ async fn main() -> std::io::Result<()> {
 	    }
 	    // TODO: CTRL+C LOOP!? - WATCH may be called in non-main thread....
 		//Ok(_v)
-	}), vec![build_task], false);
+	}), vec![], false);
 
 	// COMMAND EXECUTE!
 	

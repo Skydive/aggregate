@@ -20,7 +20,9 @@
 		"processor": "concat",
 		"options": {
 			"prefix": "js",
-			"dest": "static/js"
+			"ext": "js",
+			"dest": "static/js",
+			"revision": true
 		},
 		"content": {
 			"vendor": [
@@ -41,12 +43,44 @@
 			]
 		}
 	},{
+		"name": "css",
+		"processor": "concat",
+		"options": {
+			"prefix": "css",
+			"dest": "static/css",
+			"ext": "css"
+		},
+		"content": {
+			"vendor": [
+				"**/*.css"
+			],
+			"sky": [
+				"**/*.css"
+			],
+			"app": [
+				"**/*.css"
+			]
+		}
+
+	},{
 		"name": "static",
 		"processor": "clone",
 		"options": {
 			"prefix": "static",
 			"dest": "static",
 			"revision": true
+		},
+		"content": [
+			"**/*.*"
+		]
+	},
+	{
+		"name": "assets",
+		"processor": "clone",
+		"options": {
+			"prefix": "assets",
+			"dest": "assets",
+			"revision": false
 		},
 		"content": [
 			"**/*.*"

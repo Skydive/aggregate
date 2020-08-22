@@ -29,7 +29,7 @@ impl FileHandle {
 	pub fn file_path(&self) -> PathBuf {
 		Path::new(&self.out_path).join(&self.rel_path).to_path_buf()
 	}
-
+	
 	pub fn load(out_path: PathBuf, rel_path: PathBuf) -> Result<FileHandle, VinylError> {
 		let path = Path::new(&out_path).join(&rel_path).to_path_buf();
 		match fs::read(&path) {
@@ -85,10 +85,10 @@ impl Vinyl {
 	}
 
 	pub fn flatten(vs: Vec<Vinyl>) -> Vinyl {
-		vs.iter().fold(Vinyl::default(), |acc, v| Vinyl { 
-			handles: [&acc.handles[..], &v.handles[..]].concat(), 
-			revision_pairs: [&acc.revision_pairs[..], &v.revision_pairs[..]].concat()
-		})
+		Vinyl {
+			handles: vs.iter().flat_map(|v| v.handles.clone()).collect::<Vec<_>>(),
+			revision_pairs: vs.iter().flat_map(|v| v.revision_pairs.clone()).collect::<Vec<_>>(),
+		}
 	}
 
 	pub fn insert(mut self, f: FileHandle) -> Vinyl {

@@ -90,7 +90,7 @@ impl Aggregate {
 					.collect::<Vec<_>>()).await.into_iter().collect::<Result<Vec<_>, _>>()?);
 				}
 			}
-			
+			if !cur_task.quiet { Log::task(format!("{}\t{}", Color::Green.paint("Task Execing: "), cur_task.name.clone())); }
 			let result = (cur_task.fnc)(ov); 
 			let end_time = Local::now();
 			match result {
