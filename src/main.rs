@@ -19,15 +19,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use std::fs;
-
 use std::env;
-use async_std::task;
 
 use ansi_term::Color;
-
-
 use petgraph::Graph;
-use vinyl::Vinyl;
 
 use aggregate::{Aggregate, ProcessTask, TaskGraph};
 
