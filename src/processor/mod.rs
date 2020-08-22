@@ -5,7 +5,7 @@ use super::config::{ConfigModule, ConfigMeta};
 
 use serde_json::value::Value;
 
-//pub mod js;
+pub mod concat;
 pub mod clone;
 pub mod htmlpages;
 
@@ -17,7 +17,7 @@ use glob::glob;
 lazy_static! {
 	pub static ref PROCESSOR_MAP: HashMap<&'static str, Box<dyn Sync + GenerateGraphs>> = {
 		let mut map = HashMap::new();
-		// map.insert("js", js::new_processor());
+		map.insert("concat", concat::new_processor());
 		map.insert("clone", clone::new_processor());
 		map.insert("htmlpages", htmlpages::new_processor());
 		map
@@ -31,6 +31,6 @@ pub trait GenerateGraphs {
 
 pub fn path_wildcards(paths: Vec<PathBuf>) -> Vec<PathBuf> {
 	paths.iter().flat_map(|pth| {
-		glob(pth.to_str().unwrap()).unwrap().map(|x| x.ok()).filter_map(id).collect::<Vec<PathBuf>>()
+		glob(pth.to_str().unwrap()).unwrap().filter_map(|x| x.ok()).collect::<Vec<PathBuf>>()
 	}).collect::<Vec<PathBuf>>()
 }

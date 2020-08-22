@@ -1,5 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-#![feature(thread_id_value)]
+#![feature(thread_id_value, or_patterns)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -14,10 +14,12 @@ mod vinyl;
 mod aggregate;
 mod processor;
 mod log;
-mod util;
 
+use std::path::Path;
 use std::sync::Arc;
+
 use std::fs;
+
 use std::env;
 use async_std::task;
 
@@ -33,11 +35,15 @@ use log::Log;
 use processor::PROCESSOR_MAP;
 
 
+macro_rules! clone_all {
+    ($($i:ident),+) => {
+        $(let $i = $i.clone();)+
+    }
+}
 
 
-// TODO: revisioning
 // TODO: watchers
-// TODO: macros + code cleanup
+// TODO: macro + code cleanup
 // TODO: MODULARITY?!?!
 // TODO: SWC?!
 // TODO: htmlpages improvements
@@ -75,8 +81,34 @@ async fn main() -> std::io::Result<()> {
 			}
 		}
 	}
+	// TODO: MOVE INTO SEPERATE FUNCTION OR FILE!?
+	// TODO: MOVE REVISIONING OUT OF Vinyl -> Use Box<dyn Modifier?> API?!
+	let rev_replace_task = Aggregate::chain(&mut g, "build:rev_replace".to_string(), Box::new({
+		clone_all!(meta);
+		move |_v| {
+			let out_path_files = Path::new(&meta.base_path).join(&meta.build_path).join("**/*").to_path_buf();
+			use glob::glob;
+			use std::io::Write;
+			for file_path in glob(out_path_files.to_str().unwrap()).unwrap().filter_map(|x| x.ok()) {
+				match file_path.extension().map(|x| x.to_str().unwrap()) {
+					Some("html" | "js" | "css") => {
+						println!("{:?}", file_path);
+						let mut file_string = fs::read_to_string(&file_path)?;
+						_v.revision_pairs.iter().for_each(|(pre_name, post_name)| {
+							file_string = file_string.replace(pre_name, post_name);
+						});
+						let mut f = fs::File::create(&file_path)?;
+						f.write(file_string.as_bytes())?;
+					}
+					_ => {}
+				}
+			}
+			Ok(_v)
+		}
+	}), build_tasks, false);
+
 	Log::task(format!("{} {}", Color::Cyan.paint("Loaded procesors:"), processor_list.join(", ")));
-	Aggregate::chain(&mut g, "build".to_string(), Box::new(|_v| Ok(_v)), build_tasks, false);
+	Aggregate::chain(&mut g, "build".to_string(), Box::new(|_v| Ok(_v)), vec![rev_replace_task], false);
 	Aggregate::chain(&mut g, "deploy".to_string(), Box::new(|_v| Ok(_v)), deploy_tasks, false);
 
 	let ret = Aggregate::execute_by_name(Arc::new(g), task_name);

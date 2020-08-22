@@ -31,8 +31,8 @@ impl FileHandle {
 	}
 
 	pub fn load(out_path: PathBuf, rel_path: PathBuf) -> Result<FileHandle, VinylError> {
-		let path = Path::new(&out_path).join(&rel_path);
-		match fs::read(path) {
+		let path = Path::new(&out_path).join(&rel_path).to_path_buf();
+		match fs::read(&path) {
 			Ok(data) => Ok(FileHandle {out_path: out_path.clone(), rel_path: rel_path.clone(), data: data}),
 			Err(e) => {
 				let msg = format!("ERROR: {}", e);
@@ -64,7 +64,7 @@ impl FileHandle {
 #[derive(Debug, Clone, Default)]
 pub struct Vinyl{
 	handles: Vec<FileHandle>,
-	revision_pairs: Vec<(String, String)>
+	pub revision_pairs: Vec<(String, String)>
 }
 
 impl Vinyl {
@@ -77,7 +77,7 @@ impl Vinyl {
 	pub fn load(out_path: PathBuf, files: Vec<PathBuf>) -> Result<Vinyl, VinylError> {
 		let mut files_dedup = files.clone();
 		files_dedup.dedup(); // dedup culls duplicates!
-		Ok(Vinyl::new(files_dedup.into_iter().map(|f| FileHandle::load(out_path, f.strip_prefix(out_path).unwrap().to_path_buf())).collect::<Result<Vec<_>, _>>()?))
+		Ok(Vinyl::new(files_dedup.into_iter().map(|f| FileHandle::load(out_path.clone(), f)).collect::<Result<Vec<_>, _>>()?))
 	}
 
 	pub fn concat(self, out_path: PathBuf, rel_path: PathBuf) -> Vinyl {
@@ -121,6 +121,9 @@ impl Vinyl {
 		Ok(self.clone())
 	}
 
+	// pub fn save_manifest(self) -> Result<Vinyl, VinylError> {
+	// 	// LOCK!?
+	// }
 }
 
 impl fmt::Display for Vinyl {

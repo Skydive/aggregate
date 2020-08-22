@@ -125,7 +125,7 @@ impl ProcessorHTMLPages {
 						let pages_post = template_dirname.strip_prefix(path_prefix.clone()).unwrap();
 						let page_rel_path = Path::new(pages_post).join(out_path);
 						
-						FileHandle::new(out_prefix, page_rel_path, stage1_file.as_str()[start..pm.start()].as_bytes().to_vec()).save()?;
+						FileHandle::new(out_prefix.clone(), page_rel_path, stage1_file.as_str()[start..pm.start()].as_bytes().to_vec()).save()?;
 					}
 				}
 				_ => {}
@@ -148,10 +148,6 @@ impl GenerateGraphs for ProcessorHTMLPages {
 		let deploy_name = format!("deploy:{}", conf_html.name.clone());
 		let mut build_nodes = Vec::default();
 		let mut deploy_nodes = Vec::default();
-
-		let build_prefix = Path::new(&meta.base_path)
-			.join(&meta.build_path)
-			.join(&conf_html.options.dest).to_path_buf();
 
 		let build_prefix = Path::new(&meta.base_path)
 			.join(&meta.build_path)
