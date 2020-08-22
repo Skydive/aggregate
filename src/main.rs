@@ -19,7 +19,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use std::fs;
+<<<<<<< HEAD
 
+=======
+>>>>>>> 5376178445a4b62d486a231378a8a46bcc799e51
 use std::env;
 use async_std::task;
 
@@ -34,6 +37,7 @@ use aggregate::{Aggregate, ProcessTask, TaskGraph};
 use log::Log;
 use processor::PROCESSOR_MAP;
 
+<<<<<<< HEAD
 
 macro_rules! clone_all {
     ($($i:ident),+) => {
