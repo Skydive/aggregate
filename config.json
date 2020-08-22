@@ -2,7 +2,7 @@
 	"meta": {
 		"base_path": "..",
 		"src_path": "src",
-		"build_path": "test",
+		"build_path": "build",
 		"deploy_path": "deploy"
 	},
 	"modules": [{

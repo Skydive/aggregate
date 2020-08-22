@@ -20,7 +20,9 @@ use chrono::Local;
 use crate::log::Log;
 //type TaskFnc = fn(Vinyl) -> Vinyl;
 // TODO: MAKE THIS INTO AN ASYNC CLOSURE<--/--> FUTURE DATATYPE!
-pub type TaskFnc = Box<dyn Sync + Send + Fn(Vinyl) -> Result<Vinyl, VinylError>>;
+pub type TaskFnc = Arc<dyn Sync + Send + Fn(Vinyl) -> Result<Vinyl, VinylError>>;
+
+#[derive(Clone)]
 pub struct ProcessTask {
 	pub name: String, 
 	pub fnc: TaskFnc,

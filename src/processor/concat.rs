@@ -1,6 +1,7 @@
 use serde_json::Value;
 use serde::{Deserialize, Serialize};
 
+use std::sync::Arc;
 use std::vec::Vec;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -64,32 +65,50 @@ impl GenerateGraphs for ProcessorConcat {
 			let out_rel_path = Path::new(&conf_concat.options.dest)
 				.join(&format!("{}.js", k)).to_path_buf();
 
-			build_nodes.push(Aggregate::chain(&mut g, sub_build_name.clone(), Box::new({
+			build_nodes.push(Aggregate::chain(&mut g, sub_build_name.clone(), Arc::new({
 				clone_all!(src_path, out_path_build, out_rel_path, wild_paths_post);
 				move |_v| {
-					Ok(Vinyl::load(src_path.clone(), wild_paths_post.clone())?
-						.concat(out_path_build.clone(), out_rel_path.clone()))
+					Vinyl::load(src_path.clone(), wild_paths_post.clone())?
+						.concat(out_path_build.clone(), out_rel_path.clone())
+						.save_all()
 				}
 			}), vec![], false));
 
 
-			deploy_nodes.push(Aggregate::chain(&mut g, sub_deploy_name.clone(), Box::new({
+			deploy_nodes.push(Aggregate::chain(&mut g, sub_deploy_name.clone(), Arc::new({
 				clone_all!(src_path, out_path_deploy, out_rel_path, wild_paths_post);
 				move |_v| {
 					Ok(Vinyl::load(src_path.clone(), wild_paths_post.clone())?
 						.concat(out_path_deploy.clone(), out_rel_path.clone()))
+						
 				}
 			}), vec![], false));
 		}
 
 		(
-			Aggregate::chain(&mut g, build_name.clone(), Box::new(move |_v| {
-				Ok(_v.revisions().save_all()?)
+			Aggregate::chain(&mut g, build_name.clone(), Arc::new(move |_v| {
+				Ok(_v)
 			}), build_nodes, false), 
-			Aggregate::chain(&mut g, deploy_name.clone(), Box::new(move |_v| {
+			Aggregate::chain(&mut g, deploy_name.clone(), Arc::new(move |_v| {
 				Ok(_v.revisions().save_all()?)
 			}), deploy_nodes, false)
 		)
+	}
+
+	fn watcher_dirs_and_tasks(&self, meta: ConfigMeta, cfg_mod: ConfigModule<Value, Value>) -> (Vec<String>, Vec<String>) {
+		let conf_concat: ConfigModule<OptionsConcat, ContentConcat> = ConfigModule {
+			name: cfg_mod.name.clone(),
+			processor: cfg_mod.processor.clone(),
+			options: serde_json::from_value(cfg_mod.options.clone()).unwrap(),
+			content: serde_json::from_value(cfg_mod.content.clone()).unwrap(),
+		};
+		let prefix_path = Path::new(&meta.base_path)
+				.join(&meta.src_path)
+				.join(&conf_concat.options.prefix)
+				.to_str().unwrap().to_string();
+
+		let build_name = format!("build:{}", conf_concat.name);
+		(vec![prefix_path], vec![build_name])
 	}
 }
 

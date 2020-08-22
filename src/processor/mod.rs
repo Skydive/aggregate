@@ -9,10 +9,11 @@ pub mod concat;
 pub mod clone;
 pub mod htmlpages;
 
-use std::convert::identity as id;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use glob::glob;
+
+
 
 lazy_static! {
 	pub static ref PROCESSOR_MAP: HashMap<&'static str, Box<dyn Sync + GenerateGraphs>> = {
@@ -24,9 +25,9 @@ lazy_static! {
 	};
 }
 
-
 pub trait GenerateGraphs {
 	fn generate_graphs(&self, g: &mut TaskGraph, cfg_meta: ConfigMeta, cfg_mod: ConfigModule<Value, Value>) -> (TaskIndex, TaskIndex);
+	fn watcher_dirs_and_tasks(&self, cfg_meta: ConfigMeta, cfg_mod: ConfigModule<Value, Value>) -> (Vec<String>, Vec<String>);
 }
 
 pub fn path_wildcards(paths: Vec<PathBuf>) -> Vec<PathBuf> {

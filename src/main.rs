@@ -7,6 +7,7 @@ extern crate ansi_term;
 extern crate chrono;
 extern crate petgraph;
 extern crate regex;
+extern crate notify;
 extern crate crc;
 
 mod config;
@@ -14,6 +15,7 @@ mod vinyl;
 mod aggregate;
 mod processor;
 mod log;
+
 
 use std::path::Path;
 use std::sync::Arc;
@@ -25,10 +27,9 @@ use ansi_term::Color;
 use petgraph::Graph;
 
 use aggregate::{Aggregate, ProcessTask, TaskGraph};
-
 use log::Log;
-use processor::PROCESSOR_MAP;
-
+use processor::{PROCESSOR_MAP};
+use config::{Config};
 
 macro_rules! clone_all {
     ($($i:ident),+) => {
@@ -36,16 +37,26 @@ macro_rules! clone_all {
     }
 }
 
-
-// TODO: watchers
+// TODO: clean main()
+// TODO: watchers into new file
+// TODO: per_file watchers <file_path -> task_name>
 // TODO: macro + code cleanup
+	// TODO: PATH --> STRING macro
+	// TODO: log format
+	// TODO: Shorten aggregate chain
+	// TODO: PATH construction shorten
+	// TODO: FIX clone!
 // TODO: MODULARITY?!?!
 // TODO: SWC?!
 // TODO: htmlpages improvements
 
 #[async_std::main]
 async fn main() -> std::io::Result<()> {
-	use crate::config::{Config};
+	println!("
+	   ---------------------------------
+	   |     {}     |
+	   ---------------------------------", Color::Cyan.paint("Welcome to Aggregate!"));
+
 	
 	let argsv = env::args().collect::<Vec<String>>();
 	let task_name = match argsv.len() {
@@ -56,9 +67,8 @@ async fn main() -> std::io::Result<()> {
 	let data = fs::read_to_string("./config.json").expect("Error!");
 	let conf: Config = serde_json::from_str(data.as_str()).expect("JSON Error!");
 	let meta = &conf.meta;
-	
 
-	let mut g: TaskGraph = Graph::<ProcessTask, ()>::new();
+	let mut g: TaskGraph = Graph::<ProcessTask, ()>::new(); // TODO: Make Lazy Static + Arc<RcLock<Graph::new()>>
 	let mut build_tasks = Vec::default();
 	let mut deploy_tasks = Vec::default();
 
@@ -78,7 +88,7 @@ async fn main() -> std::io::Result<()> {
 	}
 	// TODO: MOVE INTO SEPERATE FUNCTION OR FILE!?
 	// TODO: MOVE REVISIONING OUT OF Vinyl -> Use Box<dyn Modifier?> API?!
-	let rev_replace_task = Aggregate::chain(&mut g, "build:rev_replace".to_string(), Box::new({
+	let rev_replace_task = Aggregate::chain(&mut g, "deploy:rev_replace".to_string(), Arc::new({
 		clone_all!(meta);
 		move |_v| {
 			let out_path_files = Path::new(&meta.base_path).join(&meta.build_path).join("**/*").to_path_buf();
@@ -100,13 +110,78 @@ async fn main() -> std::io::Result<()> {
 			}
 			Ok(_v)
 		}
-	}), build_tasks, false);
+	}), deploy_tasks, false);
 
-	Log::task(format!("{} {}", Color::Cyan.paint("Loaded procesors:"), processor_list.join(", ")));
-	Aggregate::chain(&mut g, "build".to_string(), Box::new(|_v| Ok(_v)), vec![rev_replace_task], false);
-	Aggregate::chain(&mut g, "deploy".to_string(), Box::new(|_v| Ok(_v)), deploy_tasks, false);
+	Log::task(format!("{} {}", Color::Blue.paint("Loaded procesors:"), processor_list.join(", ")));
+	let build_task = Aggregate::chain(&mut g, "build".to_string(), Arc::new(|_v| Ok(_v)), build_tasks, false);
+	Aggregate::chain(&mut g, "deploy".to_string(), Arc::new(|_v| Ok(_v)), vec![rev_replace_task], false);
 
+
+	// WATCH SECTION OF CODE
+	use notify::{Watcher, RecursiveMode, DebouncedEvent, watcher};
+	use std::sync::mpsc::channel;
+	use std::time::Duration;
+	use std::collections::HashMap;
+
+	let watcher_g = g.clone();
+	let conf_modules = conf.modules.clone();
+	let meta = meta.clone();
+	Aggregate::chain(&mut g, "watch".to_string(), Arc::new(move |_v| {
+		let (tx, rx) = channel();
+		let mut watcher = watcher(tx, Duration::from_millis(500)).unwrap();
+		
+		let mut paths_tasks: HashMap<String, Vec<String>> = HashMap::new();
+		for m in conf_modules.clone() {
+			match PROCESSOR_MAP.get(m.processor.as_str()) {
+				Some(v) => {
+					let (vec_paths, vec_tasks) = v.watcher_dirs_and_tasks(meta.clone(), m.clone());
+
+					vec_paths.iter().for_each(|p_str| {
+						Log::task(format!("{} {} -> {}", Color::Blue.paint("Task Watch:    "), p_str, vec_tasks.join(", ")));
+						paths_tasks.insert(p_str.clone(), vec_tasks.clone());
+						watcher.watch(p_str, RecursiveMode::Recursive).unwrap();
+					})
+				},
+				_ => {
+					Log::task(format!("{} {}", Color::Red.paint("Missing processor:"), m.processor.clone()));
+				}
+			}
+		}
+
+		// 
+
+		loop {
+	        match rx.recv() {
+	           Ok(event) => {
+	           		//println!("{:?}", event);
+	           		match event {
+	           			DebouncedEvent::Create(p) | DebouncedEvent::Write(p) => {
+	           				let rel_dir = p.strip_prefix(env::current_dir().unwrap()).unwrap().to_path_buf();
+	           				//println!("{:?}", rel_dir);
+
+	           				Log::task(format!("{} {:?}", Color::Yellow.paint("File Changed:   "), rel_dir));
+	           				paths_tasks.iter().filter(|(pth_name, _)| rel_dir.starts_with(pth_name)).for_each(|(_,ts)| {
+	           					Log::task(format!("{} {:?}", Color::Yellow.paint("Executing Tasks:"), ts.join(", ")));
+	           					ts.iter().for_each(|t| {
+	           						let ret = Aggregate::execute_by_name(Arc::new(watcher_g.clone()), &t);
+	           						//println!("JS TASKS END! {}", ret.unwrap());
+	           					});
+	           					
+	           				});
+	           			}
+	           			_ => {}
+	           		}
+	           },
+	           Err(e) => println!("watch error: {:?}", e),
+	        }
+	    }
+	    // TODO: CTRL+C LOOP!? - WATCH may be called in non-main thread....
+		//Ok(_v)
+	}), vec![build_task], false);
+
+	// COMMAND EXECUTE!
+	
 	let ret = Aggregate::execute_by_name(Arc::new(g), task_name);
-	println!("JS TASKS END! {}", ret.unwrap());
+	//println!("JS TASKS END! {}", ret.unwrap());
     Ok(())
 }

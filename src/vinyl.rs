@@ -128,8 +128,7 @@ impl Vinyl {
 
 impl fmt::Display for Vinyl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		//write!(f, "Vinyl: {}", self.handles.iter().map(|v| v.file_path.to_str().unwrap().to_string()).collect::<Vec<String>>().join(", "))
-		write!(f, "Vinyl: {:?}", self.revision_pairs)
+		write!(f, "Vinyl:\n Files: [{}] - \n RevPairs: {:?}", self.handles.iter().map(|v| v.file_path().to_str().unwrap().to_string()).collect::<Vec<String>>().join(", "), self.revision_pairs)
     }
 }
 

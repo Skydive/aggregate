@@ -5,6 +5,7 @@ use std::vec::Vec;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::fs;
+use std::sync::Arc;
 
 use regex::Regex;
 
@@ -167,7 +168,7 @@ impl GenerateGraphs for ProcessorHTMLPages {
 
 			let page_template_path = path_prefix.join(page).join("template.html").to_path_buf();
 			
-			build_nodes.push(Aggregate::chain(&mut g, build_name_page.clone(), Box::new({
+			build_nodes.push(Aggregate::chain(&mut g, build_name_page.clone(), Arc::new({
 				clone_all!(meta, page, page_template_path, path_prefix, build_prefix);
 				move |_v| {
 					if !(*page_template_path).exists() { 
@@ -180,7 +181,7 @@ impl GenerateGraphs for ProcessorHTMLPages {
 			}), vec![], false));
 
 			let (cap_meta, cap_page, cap_template_path, cap_path_prefix, cap_deploy_prefix) = (meta.clone(), page.clone(), page_template_path.clone(), path_prefix.clone(), deploy_prefix.clone());
-			deploy_nodes.push(Aggregate::chain(&mut g, deploy_name_page.clone(), Box::new(move |_v| {
+			deploy_nodes.push(Aggregate::chain(&mut g, deploy_name_page.clone(), Arc::new(move |_v| {
 				if !(*cap_template_path).exists() { 
 					return Err(VinylError{msg: format!("ERROR: {} {:?}", cap_page.clone(), cap_template_path.clone())});
 				}
@@ -191,9 +192,30 @@ impl GenerateGraphs for ProcessorHTMLPages {
 		}
 
 		(
-			Aggregate::chain(&mut g, build_name.clone(), Box::new(move |_v| Ok(Vinyl::default())), build_nodes, false), 
-			Aggregate::chain(&mut g, deploy_name.clone(), Box::new(move |_v| Ok(Vinyl::default())), deploy_nodes, false)
+			Aggregate::chain(&mut g, build_name.clone(), Arc::new(move |_v| Ok(Vinyl::default())), build_nodes, false), 
+			Aggregate::chain(&mut g, deploy_name.clone(), Arc::new(move |_v| Ok(Vinyl::default())), deploy_nodes, false)
 		)
+	}
+
+	fn watcher_dirs_and_tasks(&self, meta: ConfigMeta, cfg_mod: ConfigModule<Value, Value>) -> (Vec<String>, Vec<String>) {
+		let conf_html: ConfigModule<OptionsHTMLPages, ContentHTMLPages> = ConfigModule {
+			name: cfg_mod.name.clone(),
+			processor: cfg_mod.processor.clone(),
+			options: serde_json::from_value(cfg_mod.options.clone()).unwrap(),
+			content: serde_json::from_value(cfg_mod.content.clone()).unwrap(),
+		};
+		let pages_path = Path::new(&meta.base_path)
+				.join(&meta.src_path)
+				.join(&conf_html.options.prefix)
+				.to_str().unwrap().to_string();
+		let requires_path = Path::new(&meta.base_path)
+				.join(&meta.src_path)
+				.join("requires")
+				// TODO: .join(&conf_html.options.prefix_requires)
+				.to_str().unwrap().to_string();
+
+		let build_name = format!("build:{}", conf_html.name);
+		(vec![pages_path, requires_path], vec![build_name])
 	}
 }
 
