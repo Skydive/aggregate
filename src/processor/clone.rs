@@ -56,8 +56,7 @@ impl GenerateGraphs for ProcessorClone {
 		let out_path_build = Path::new(&meta.base_path)
 			.join(&meta.build_path);
 		let out_path_deploy = Path::new(&meta.base_path)
-			.join(&meta.deploy_path)
-			.join(&conf_clone.options.dest).to_path_buf();
+			.join(&meta.deploy_path);
 
 		let src_path = Path::new(&meta.base_path)
 			.join(&meta.src_path).to_path_buf();
