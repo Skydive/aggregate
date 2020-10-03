@@ -66,7 +66,11 @@ macro_rules! clone_all {
 
 #[async_std::main]
 async fn main() -> std::io::Result<()> {
-	println!("\n\t   ---------------------------------\n\t   |     {}     |\n\t   ---------------------------------", Color::Cyan.paint("Welcome to Aggregate!"));
+	println!(
+"	   ---------------------------------
+	   |     {}     |
+	   ---------------------------------",
+Color::Cyan.paint("Welcome to Aggregate!"));
 
 	
 	let argsv = env::args().collect::<Vec<String>>();
@@ -109,7 +113,7 @@ async fn main() -> std::io::Result<()> {
 			for file_path in glob(out_path_files.to_str().unwrap()).unwrap().filter_map(|x| x.ok()) {
 				match file_path.extension().map(|x| x.to_str().unwrap()) {
 					Some("html" | "js" | "css") => {
-						println!("{:?}", file_path);
+						println!("Replacing in: {:?}", file_path);
 						let mut file_string = fs::read_to_string(&file_path)?;
 						_v.revision_pairs.iter().for_each(|(pre_name, post_name)| {
 							file_string = file_string.replace(pre_name, post_name);

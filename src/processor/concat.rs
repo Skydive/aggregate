@@ -46,7 +46,6 @@ impl GenerateGraphs for ProcessorConcat {
 		};
 
 		let rev = conf_concat.options.revision;
-
 		let build_name = format!("build:{}", conf_concat.name);
 		let deploy_name = format!("deploy:{}", conf_concat.name);
 		let mut build_nodes = Vec::default();
@@ -83,9 +82,15 @@ impl GenerateGraphs for ProcessorConcat {
 			deploy_nodes.push(Aggregate::chain(&mut g, sub_deploy_name.clone(), Arc::new({
 				clone_all!(src_path, out_path_deploy, out_rel_path, wild_paths_post);
 				move |_v| {
-					Ok(Vinyl::load(src_path.clone(), wild_paths_post.clone())?
+					if rev { 
+						Ok(Vinyl::load(src_path.clone(), wild_paths_post.clone())?
 						.concat(out_path_deploy.clone(), out_rel_path.clone()))
-						
+					}
+					else {
+						Vinyl::load(src_path.clone(), wild_paths_post.clone())?
+						.concat(out_path_build.clone(), out_rel_path.clone())
+						.save_all()
+					}
 				}
 			}), vec![], false));
 		}
