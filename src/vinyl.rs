@@ -43,7 +43,7 @@ impl FileHandle {
 	}
 
 	pub fn save(&self) -> Result<(), VinylError> {
-		println!("Saving: {:?}", &self.file_path());
+		//println!("Saving: {:?}", &self.file_path());
 		if !(*self.file_path()).exists() {
 			fs::create_dir_all((*self.file_path()).parent().unwrap())?;
 		}

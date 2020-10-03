@@ -89,20 +89,19 @@ impl ProcessorHTMLPages {
 				[_, "import", import_path] => {
 					let file_path = Self::format_import_arg(import_path.to_string(), template_dirname.clone(), meta.clone());
 					if file_path.exists() {
-						//crate::Log::task(format!("EXISTS: {:?}", file_path));
+						let tag = match (*file_path).extension()
+							.and_then(std::ffi::OsStr::to_str) {
+							Some("js")  => Some("script"),
+							Some("css") => Some("style"),
+							_ => None
+						};
+
 						let data_str = fs::read_to_string(file_path)?;
+
+						if let Some(t) = tag { stage1_template += &("<".to_owned()+t+">"); }
 						stage1_template += &data_str;
-					} else {
-						crate::Log::task(format!("NOT: {:?}", file_path));
+						if let Some(t) = tag { stage1_template += &("</".to_owned()+t+">"); }
 					}
-				}
-				[_, "import-js", import_path] => {
-					let file_path = Self::format_import_arg(import_path.to_string(), template_dirname.clone(), meta.clone());
-				
-					let data_str = fs::read_to_string(file_path)?;
-					stage1_template += "<script>";
-						stage1_template += &data_str;
-					stage1_template += "</script>";
 				}
 				[_, s, ..] => {
 					if let Some(_) = STAGE1_IGNORE_CMD.iter().find(|ss| ss == &s) {
@@ -129,7 +128,6 @@ impl ProcessorHTMLPages {
 			}).collect::<Vec<&str>>();
 			match &cap[..] {
 				[_, "output-begin", out_path] => {
-
 					output_map.insert(out_path, pm.end());
 				},
 				[_, "output-end", out_path] => {
@@ -138,7 +136,6 @@ impl ProcessorHTMLPages {
 						let pages_post = template_dirname.strip_prefix(path_prefix.clone()).unwrap();
 						let page_rel_path = Path::new(pages_post).join(out_path);
 						
-						println!("WELL: {:?}", page_rel_path);
 						FileHandle::new(out_prefix.clone(), page_rel_path, stage1_file.as_str()[start..pm.start()].as_bytes().to_vec()).save()?;
 					}
 				}
