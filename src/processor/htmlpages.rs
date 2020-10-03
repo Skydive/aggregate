@@ -72,12 +72,11 @@ impl ProcessorHTMLPages {
 		}
 		"".to_string() */
 
-	pub fn process_template(template_path: PathBuf, meta: ConfigMeta) -> Result<String, VinylError> {
+	pub fn process_template(template_dirname: PathBuf, template_file_path: PathBuf, meta: ConfigMeta) -> Result<String, VinylError> {
 		// PERFORM IMPORT COMMANDS
 		let mut stage1_template = String::default();
-		let template_dirname = (*template_path).parent().unwrap().to_path_buf();
 
-		let template = fs::read_to_string(template_path.to_str().unwrap().to_string()).expect("Error!");
+		let template = fs::read_to_string(template_file_path.to_str().unwrap().to_string()).expect("Error!");
 		let mut last_index: usize = 0;
 		for pm in REGEX_CMD.find_iter(&template) {
 			let cap = REGEX_CMD.captures(pm.as_str()).unwrap().iter().map(|om| {
@@ -89,9 +88,13 @@ impl ProcessorHTMLPages {
 			match &cap[..] {
 				[_, "import", import_path] => {
 					let file_path = Self::format_import_arg(import_path.to_string(), template_dirname.clone(), meta.clone());
-				
-					let data_str = fs::read_to_string(file_path)?;
-					stage1_template += &data_str;
+					if file_path.exists() {
+						//crate::Log::task(format!("EXISTS: {:?}", file_path));
+						let data_str = fs::read_to_string(file_path)?;
+						stage1_template += &data_str;
+					} else {
+						crate::Log::task(format!("NOT: {:?}", file_path));
+					}
 				}
 				[_, "import-js", import_path] => {
 					let file_path = Self::format_import_arg(import_path.to_string(), template_dirname.clone(), meta.clone());
@@ -126,6 +129,7 @@ impl ProcessorHTMLPages {
 			}).collect::<Vec<&str>>();
 			match &cap[..] {
 				[_, "output-begin", out_path] => {
+
 					output_map.insert(out_path, pm.end());
 				},
 				[_, "output-end", out_path] => {
@@ -134,6 +138,7 @@ impl ProcessorHTMLPages {
 						let pages_post = template_dirname.strip_prefix(path_prefix.clone()).unwrap();
 						let page_rel_path = Path::new(pages_post).join(out_path);
 						
+						println!("WELL: {:?}", page_rel_path);
 						FileHandle::new(out_prefix.clone(), page_rel_path, stage1_file.as_str()[start..pm.start()].as_bytes().to_vec()).save()?;
 					}
 				}
@@ -174,28 +179,43 @@ impl GenerateGraphs for ProcessorHTMLPages {
 			let build_name_page = format!("{}:{}", build_name.clone(), page.clone());
 			let deploy_name_page = format!("{}:{}", deploy_name.clone(), page.clone());
 
-			let page_template_path = path_prefix.join(page).join("template.html").to_path_buf();
-			
+			let mut page_template_path = path_prefix.join(page).join("template.html").to_path_buf();
+			let out_page_template_path = page_template_path.clone();
+			let out_page_template_dir = (*page_template_path).parent().unwrap().to_path_buf();
+
+			let mut page_template_dirname = (*page_template_path).parent().unwrap().to_path_buf();
+			println!("{:?}", page_template_dirname);
+			while let Some(s) = page_template_dirname.to_str() {
+				if s == ".." { panic!("Error! - template.html not found"); }
+				println!("{:?}", page_template_dirname);
+				page_template_path = (*page_template_dirname).join("template.html").to_path_buf();
+				if page_template_path.exists() { break; }
+				page_template_dirname = (*page_template_dirname).parent().unwrap().to_path_buf();
+			}
+			println!("{:?}", page_template_path);
+
 			build_nodes.push(Aggregate::chain(&mut g, build_name_page.clone(), Arc::new({
-				clone_all!(meta, page, page_template_path, path_prefix, build_prefix);
+				clone_all!(meta, page, out_page_template_dir, out_page_template_path, page_template_path, path_prefix, build_prefix);
 				move |_v| {
 					if !(*page_template_path).exists() { 
 						return Err(VinylError{msg: format!("ERROR: {} {:?}", page.clone(), page_template_path.clone())});
 					}
-					let stage1_template = Self::process_template(page_template_path.clone(), meta.clone())?;
-					Self::write_outputs(page_template_path.clone(), meta.clone(), stage1_template, path_prefix.clone(), build_prefix.clone())?;
+					let stage1_template = Self::process_template(out_page_template_dir.clone(), page_template_path.clone(), meta.clone())?;
+					Self::write_outputs(out_page_template_path.clone(), meta.clone(), stage1_template, path_prefix.clone(), build_prefix.clone())?;
 					Ok(_v)
 				}
 			}), vec![], false));
 
-			let (cap_meta, cap_page, cap_template_path, cap_path_prefix, cap_deploy_prefix) = (meta.clone(), page.clone(), page_template_path.clone(), path_prefix.clone(), deploy_prefix.clone());
-			deploy_nodes.push(Aggregate::chain(&mut g, deploy_name_page.clone(), Arc::new(move |_v| {
-				if !(*cap_template_path).exists() { 
-					return Err(VinylError{msg: format!("ERROR: {} {:?}", cap_page.clone(), cap_template_path.clone())});
+			deploy_nodes.push(Aggregate::chain(&mut g, deploy_name_page.clone(), Arc::new({
+				clone_all!(meta, page, out_page_template_dir, out_page_template_path, page_template_path, path_prefix, deploy_prefix);
+				move |_v| {
+					if !(*page_template_path).exists() { 
+						return Err(VinylError{msg: format!("ERROR: {} {:?}", page.clone(), page_template_path.clone())});
+					}
+					let stage1_template = Self::process_template(out_page_template_dir.clone(), page_template_path.clone(), meta.clone())?;
+					Self::write_outputs(out_page_template_path.clone(), meta.clone(), stage1_template, path_prefix.clone(), deploy_prefix.clone())?;
+					Ok(_v)
 				}
-				let stage1_template = Self::process_template(cap_template_path.clone(), cap_meta.clone())?;
-				Self::write_outputs(cap_template_path.clone(), cap_meta.clone(), stage1_template, cap_path_prefix.clone(), cap_deploy_prefix.clone())?;
-				Ok(_v)
 			}), vec![], false));
 		}
 

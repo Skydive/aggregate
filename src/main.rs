@@ -94,7 +94,7 @@ Color::Cyan.paint("Welcome to Aggregate!"));
 				let (build_task, deploy_task) = v.generate_graphs(&mut g, meta.clone(), m.clone());
 				build_tasks.push(build_task.clone());
 				deploy_tasks.push(deploy_task.clone());
-				processor_list.push(m.processor.clone());
+				processor_list.push(format!("{} ({})", m.name, m.processor.clone()));
 			},
 			_ => {
 				Log::task(format!("{} {}", Color::Red.paint("Missing processor:"), m.processor.clone()));
